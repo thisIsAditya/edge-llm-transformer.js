@@ -1,0 +1,47 @@
+{
+  "name": "local-llm-agent",
+  "version": "1.0.0",
+  "description": "Local LLM HTTP API backend with Magentic-One-inspired orchestration, pgvector memory, and Exa MCP tooling.",
+  "type": "module",
+  "main": "./src/server/index.ts",
+  "scripts": {
+    "dev": "tsx --env-file=.env src/server/index.ts",
+    "start": "tsc --noEmit && tsx --env-file=.env src/server/index.ts",
+    "db:migrate": "tsx --env-file=.env scripts/migrate.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint \"src/**/*.ts\" \"scripts/**/*.ts\"",
+    "lint:fix": "eslint \"src/**/*.ts\" \"scripts/**/*.ts\" --fix",
+    "format": "prettier --write \"src/**/*.ts\" \"scripts/**/*.ts\""
+  },
+  "dependencies": {
+    "@ai-sdk/mcp": "^2.0.4",
+    "@huggingface/transformers": "^4.2.0",
+    "ai": "^7.0.9",
+    "ai-sdk-ollama": "^4.0.0",
+    "cors": "^2.8.6",
+    "dotenv": "^16.5.0",
+    "express": "^5.2.1",
+    "onnxruntime-node": "^1.27.0",
+    "pg": "^8.22.0",
+    "pgvector": "^0.3.0",
+    "uuid": "^11.1.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.19.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.15.14",
+    "@types/pg": "^8.11.11",
+    "@types/uuid": "^10.0.0",
+    "eslint": "^9.19.0",
+    "globals": "^15.14.0",
+    "prettier": "^3.4.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.22.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

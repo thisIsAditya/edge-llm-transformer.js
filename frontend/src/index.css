@@ -1,0 +1,100 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  /* Light lavender surface scale */
+  --color-app:            #f7f5fd;
+  --color-panel:          #ffffff;
+  --color-surface:        #fbfaff;
+  --color-hover:          #f1ecfb;
+  --color-border:         #e7e1f7;
+  --color-border-strong:  #d6c9f2;
+
+  /* Text scale */
+  --color-ink:      #211a3d;
+  --color-ink-soft: #6e6590;
+  --color-ink-dim:  #a79dc7;
+
+  /* Brand (violet) */
+  --color-brand:       #7c3aed;
+  --color-brand-hover: #6d28d9;
+  --color-brand-soft:  #efe9fd;
+}
+
+@layer base {
+  html, body, #root {
+    height: 100%;
+    background: #f7f5fd;
+    color: #211a3d;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #d6c9f2 transparent;
+  }
+}
+
+/* Prose theme tuned for the light lavender surface */
+.prose-lav {
+  --tw-prose-body: #2d2350;
+  --tw-prose-headings: #4c1d95;
+  --tw-prose-lead: #6e6590;
+  --tw-prose-links: #7c3aed;
+  --tw-prose-bold: #211a3d;
+  --tw-prose-counters: #6e6590;
+  --tw-prose-bullets: #c4b5f0;
+  --tw-prose-hr: #e7e1f7;
+  --tw-prose-quotes: #4c1d95;
+  --tw-prose-quote-borders: #c4b5f0;
+  --tw-prose-captions: #6e6590;
+  --tw-prose-code: #6d28d9;
+  --tw-prose-pre-code: #e4ddf8;
+  --tw-prose-pre-bg: #211a3d;
+  --tw-prose-th-borders: #e7e1f7;
+  --tw-prose-td-borders: #f1ecfb;
+}
+
+/* Inline code without prose */
+.prose-lav code:not(pre code) {
+  background: #efe9fd;
+  border: 1px solid #e0d5fa;
+  border-radius: 4px;
+  padding: 0.1em 0.4em;
+  font-size: 0.85em;
+  color: #6d28d9;
+}
+
+/* Scrollable message list */
+.messages-scroll {
+  scroll-behavior: smooth;
+}
+
+/* Blinking cursor appended to the last streamed text */
+.streaming-cursor::after {
+  content: "▋";
+  display: inline-block;
+  margin-left: 1px;
+  color: #7c3aed;
+  animation: blink 1s step-end infinite;
+  font-size: 0.8em;
+  vertical-align: middle;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+/* Sidebar width transition for collapse/expand */
+.sidebar-transition {
+  transition: width 180ms ease, padding 180ms ease;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fade-in 200ms ease-out;
+}

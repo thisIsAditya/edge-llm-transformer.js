@@ -1,0 +1,15 @@
+{
+  "name": "local-llm",
+  "private": true,
+  "description": "Local LLM chat with voice input — monorepo (frontend + core)",
+  "scripts": {
+    "dev:core": "npm run dev --prefix core",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "db:migrate": "npm run db:migrate --prefix core",
+    "typecheck": "npm run typecheck --prefix core",
+    "lint": "npm run lint --prefix core"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

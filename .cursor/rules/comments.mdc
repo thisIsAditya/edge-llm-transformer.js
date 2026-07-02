@@ -1,0 +1,29 @@
+---
+description: Comment style — only when non-obvious, prefer block comments, fix bad comments
+alwaysApply: true
+---
+
+# Comments
+
+1. **Only comment what is not obvious.** Do not narrate what the code already says (control flow, variable names, simple assignments).
+
+2. **Prefer `/** */` block comments** for non-obvious notes. Use separate block comments for distinct concerns instead of one long paragraph or many `//` lines.
+
+3. **Fix bad comments when you touch a file.** Remove stale, redundant, or misleading comments. Rewrite vague notes into concise block comments, or delete them if the code is clear.
+
+## Examples
+
+```typescript
+// BAD — obvious
+// Auto-resize textarea
+useEffect(() => { ... }, [value]);
+
+// BAD — long // paragraph
+// This function loads the model and handles errors...
+
+// GOOD — non-obvious, concise block comment
+/** WASM defaults to q8 and resolves `model.quant_quantized.onnx`; use fp32 so the file is `model.quant.onnx`. */
+classifier = await pipeline(..., { dtype: "fp32", ... });
+```
+
+Keep `eslint-disable`, license headers, and generated references (e.g. `/// <reference ...>`) as-is.
