@@ -16,7 +16,16 @@ interface ChatWindowProps {
 
 export function ChatWindow({ conversationId, conversationTitle, onTitleGenerated }: ChatWindowProps) {
   const [input, setInput] = useState("");
-  const titleFiredRef = useRef(false);
+
+  /** Set once when the first user message of a new conversation is sent. */
+  const firstUserTextRef = useRef<string | null>(null);
+  /** Prevents generating a title more than once per conversation mount. */
+  const titleFiredRef    = useRef(false);
+  /** Always holds the latest messages without adding them to effect deps. */
+  const messagesRef      = useRef<UIMessage[]>([]);
+  /** Keeps the callback fresh inside the status-watch effect. */
+  const onTitleRef       = useRef(onTitleGenerated);
+  onTitleRef.current     = onTitleGenerated;
 
   const { messages, sendMessage, status, setMessages } = useChat({
     id: conversationId,
@@ -25,10 +34,13 @@ export function ChatWindow({ conversationId, conversationTitle, onTitleGenerated
     }),
   });
 
+  messagesRef.current = messages;
+
   useEffect(() => {
     setMessages([]);
     setInput("");
-    titleFiredRef.current = false;
+    titleFiredRef.current    = false;
+    firstUserTextRef.current = null;
 
     api
       .getMessages(conversationId)
@@ -48,6 +60,20 @@ export function ChatWindow({ conversationId, conversationTitle, onTitleGenerated
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 
+  /**
+   * After the first assistant reply finishes streaming, generate a title from
+   * both the user question and the assistant answer for better context.
+   */
+  useEffect(() => {
+    if (status !== "ready" || !firstUserTextRef.current) return;
+
+    const userText  = firstUserTextRef.current;
+    firstUserTextRef.current = null;
+
+    onTitleRef.current(userText);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
+
   const isStreaming = status === "streaming" || status === "submitted";
   const conversationContext = useConversationContext(messages, status, conversationId);
 
@@ -56,9 +82,10 @@ export function ChatWindow({ conversationId, conversationTitle, onTitleGenerated
     if (!trimmed || isStreaming) return;
     setInput("");
 
+    /** Record the first user message so the status effect can use it. */
     if (messages.length === 0 && !conversationTitle && !titleFiredRef.current) {
-      titleFiredRef.current = true;
-      onTitleGenerated(trimmed);
+      titleFiredRef.current    = true;
+      firstUserTextRef.current = trimmed;
     }
 
     sendMessage({ parts: [{ type: "text", text: trimmed }] });

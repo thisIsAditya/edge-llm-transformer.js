@@ -1,8 +1,9 @@
 import { useRef, useState, useEffect, type KeyboardEvent } from "react";
-import { Send, Loader2, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Send, Loader2, ShieldAlert, ShieldCheck, Wand2 } from "lucide-react";
 import { MicButton } from "./MicButton.js";
+import { GrammarUnderlay } from "./GrammarUnderlay.js";
 import { useSpeechToText } from "../hooks/useSpeechToText.js";
-import { useAutocomplete } from "../hooks/useAutocomplete.js";
+import { useGrammarCheck } from "../hooks/useGrammarCheck.js";
 import { usePromptGuard } from "../hooks/usePromptGuard.js";
 
 interface ComposerProps {
@@ -17,7 +18,10 @@ type GuardNotice =
   | { type: "blocked"; message: string }
   | { type: "masked"; labels: string[] };
 
-export function Composer({ value, onChange, onSubmit, disabled = false, context }: ComposerProps) {
+const TEXTAREA_MIRROR_CLASS =
+  "absolute inset-0 px-4 pt-3 pb-2 text-sm overflow-hidden";
+
+export function Composer({ value, onChange, onSubmit, disabled = false, context: _context }: ComposerProps) {
   const textareaRef   = useRef<HTMLTextAreaElement>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [notice, setNotice]         = useState<GuardNotice | null>(null);
@@ -29,11 +33,10 @@ export function Composer({ value, onChange, onSubmit, disabled = false, context 
     },
   });
 
-  const { suggestion, accept, dismiss } = useAutocomplete({
+  const { errors, isChecking: isGrammarChecking, applyFix, applyAll, dismiss } = useGrammarCheck(
     value,
-    enabled: !disabled,
-    context,
-  });
+    !disabled
+  );
 
   const { checkPrompt } = usePromptGuard();
 
@@ -72,19 +75,8 @@ export function Composer({ value, onChange, onSubmit, disabled = false, context 
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Tab" && suggestion) {
-      e.preventDefault();
-      accept(value, onChange);
-      return;
-    }
-    if (e.key === "Escape" && suggestion) {
-      e.preventDefault();
-      dismiss();
-      return;
-    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (suggestion) { dismiss(); return; }
       void guardedSubmit();
     }
   };
@@ -95,15 +87,13 @@ export function Composer({ value, onChange, onSubmit, disabled = false, context 
     <div>
       <div className="relative border border-border rounded-2xl bg-panel focus-within:border-brand shadow-sm shadow-violet-100/60 transition-colors duration-200">
         <div className="relative">
-          {suggestion && (
-            <div
-              aria-hidden
-              className="absolute inset-0 px-4 pt-3 pb-2 text-sm whitespace-pre-wrap break-words pointer-events-none select-none overflow-hidden"
-            >
-              <span className="invisible">{value}</span>
-              <span className="text-ink-dim">{suggestion}</span>
-            </div>
-          )}
+          <GrammarUnderlay
+            value={value}
+            errors={errors}
+            containerClassName={TEXTAREA_MIRROR_CLASS}
+            onAccept={(idx) => applyFix(idx, value, onChange)}
+            onIgnore={(idx) => dismiss(idx)}
+          />
 
           <textarea
             ref={textareaRef}
@@ -133,8 +123,20 @@ export function Composer({ value, onChange, onSubmit, disabled = false, context 
                 <Loader2 className="w-3 h-3 animate-spin" />
                 Checking…
               </span>
-            ) : suggestion ? (
-              <span className="text-xs text-ink-dim select-none">Tab to accept · Esc to dismiss</span>
+            ) : isGrammarChecking ? (
+              <span className="flex items-center gap-1.5 text-xs text-ink-dim select-none">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Grammar…
+              </span>
+            ) : errors.length > 0 ? (
+              <button
+                onClick={() => applyAll(value, onChange)}
+                className="flex items-center gap-1.5 text-xs text-brand font-medium hover:text-brand-hover transition-colors select-none"
+                title="Apply all grammar suggestions"
+              >
+                <Wand2 className="w-3 h-3" />
+                Fix all ({errors.length})
+              </button>
             ) : null}
           </div>
 

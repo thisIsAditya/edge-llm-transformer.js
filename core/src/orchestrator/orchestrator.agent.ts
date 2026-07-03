@@ -1,5 +1,5 @@
 import { ToolLoopAgent, stepCountIs, tool } from "ai";
-import type { ToolSet } from "ai";
+import type { ToolSet, UIMessageStreamWriter } from "ai";
 import { z } from "zod";
 import { getChatModel } from "../models/provider.js";
 import { buildMemoryContext } from "../memory/retrieval.js";
@@ -14,6 +14,18 @@ import { createLogger } from "../utils/logger.js";
 
 const logger = createLogger("orchestrator");
 
+/** Shape of each sub-agent step emitted as a `data-subagentStep` UI part. */
+export interface SubagentStepData {
+  /** The parent `research` tool call this step belongs to. */
+  parentToolCallId: string;
+  /** Unique id for this sub-step (used to match start → end updates). */
+  subStepId: string;
+  toolName: string;
+  phase: "start" | "end";
+  /** Serialised input or output — kept small for display purposes. */
+  payload: string;
+}
+
 export interface OrchestratorDeps {
   pool: pg.Pool;
   conversationId: string;
@@ -24,6 +36,16 @@ export interface OrchestratorDeps {
   progressLedgerStore: ProgressLedgerStore;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   researcherAgent: ToolLoopAgent<never, any>;
+  writerRef: { current: UIMessageStreamWriter | null };
+}
+
+function safeSerialise(value: unknown, maxLen = 400): string {
+  try {
+    const s = typeof value === "string" ? value : JSON.stringify(value);
+    return s.length > maxLen ? s.slice(0, maxLen) + "…" : s;
+  } catch {
+    return String(value);
+  }
 }
 
 /**
@@ -39,21 +61,67 @@ export function buildOrchestrator(deps: OrchestratorDeps): ToolLoopAgent<never, 
     taskLedgerStore,
     progressLedgerStore,
     researcherAgent,
+    writerRef,
     pool,
   } = deps;
 
   const { memory_search, memory_save } = createMemoryTools({ conversationId, semanticStore });
 
-  const researchTool = tool({    description:
+  const researchTool = tool({
+    description:
       "Delegate a research task to the Researcher sub-agent, which uses web search and other tools to gather information. " +
       "Provide a clear, specific task description. Returns a text summary of findings.",
     inputSchema: z.object({
       task: z.string().describe("The specific research question or task to investigate."),
     }),
-    execute: async ({ task }) => {
+    execute: async ({ task }, { toolCallId }) => {
       logger.info("Delegating to researcher", { task: task.slice(0, 80) });
+
+      const writer = writerRef.current;
+
       try {
-        const result = await researcherAgent.generate({ prompt: task });
+        const result = await researcherAgent.generate({
+          prompt: task,
+          onToolExecutionStart: ({ toolCall }) => {
+            if (!writer) return;
+            const step: SubagentStepData = {
+              parentToolCallId: toolCallId,
+              subStepId: toolCall.toolCallId,
+              toolName: toolCall.toolName,
+              phase: "start",
+              payload: safeSerialise(toolCall.input),
+            };
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (writer as any).write({ type: "data-subagentStep", data: step });
+            } catch {
+              // non-fatal — stream may have already closed
+            }
+          },
+          onToolExecutionEnd: ({ toolCall, toolOutput }) => {
+            if (!writer) return;
+            const output =
+              toolOutput.type === "tool-result"
+                ? toolOutput.output
+                : toolOutput.type === "tool-error"
+                  ? toolOutput.error
+                  : undefined;
+            const step: SubagentStepData = {
+              parentToolCallId: toolCallId,
+              subStepId: toolCall.toolCallId,
+              toolName: toolCall.toolName,
+              phase: "end",
+              payload: safeSerialise(output),
+            };
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (writer as any).write({ type: "data-subagentStep", data: step });
+            } catch {
+              // non-fatal
+            }
+          },
+        });
+
         return { findings: result.text || "(No findings returned)" };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -66,12 +134,23 @@ export function buildOrchestrator(deps: OrchestratorDeps): ToolLoopAgent<never, 
   return new ToolLoopAgent({
     model: getChatModel(),
     instructions: [
-      "You are a capable orchestrator agent. You decompose tasks, delegate research, manage memory, and produce complete answers.",
-      "Workflow:",
-      "1. For each user request, decide whether you need to search memory (memory_search) or do external research (research tool).",
-      "2. After gathering information, compose a comprehensive answer.",
-      "3. Save important facts to memory using memory_save.",
-      "4. Once you have a complete answer, respond with plain prose text. Do not call any additional tools after you have your final answer.",
+      "## Role",
+      "You are a precise, knowledgeable orchestrator agent. Your job is to give the user complete, accurate, well-structured answers — not drafts or hedging placeholders.",
+      "",
+      "## Decision rules (follow in order)",
+      "1. If the user asks about something you can answer confidently from established knowledge, answer directly. Do NOT call tools unnecessarily.",
+      "2. If the answer depends on recent events, real-time data, specific URLs, or verifiable facts you are not certain about, call the `research` tool with a concrete, specific task description.",
+      "3. Before calling `research`, check `memory_search` for previously retrieved context — use it if it is relevant.",
+      "4. After receiving research findings, synthesize them into the final answer immediately. Do not call `research` a second time unless the first returned nothing useful.",
+      "",
+      "## Output quality bar",
+      "- Give concrete facts, figures, and sources whenever available. Never substitute vague generalities when specifics exist.",
+      "- If information is genuinely uncertain, state exactly what you verified and what remains unknown — do not guess.",
+      "- Structure multi-part answers with clear headings or numbered lists.",
+      "- Save important new facts the user may ask about again using `memory_save` before producing the final answer.",
+      "",
+      "## Final answer rule",
+      "Once you have a complete answer, write it in plain prose (markdown allowed). Do NOT call any more tools after this point.",
     ].join("\n"),
     tools: {
       research: researchTool,

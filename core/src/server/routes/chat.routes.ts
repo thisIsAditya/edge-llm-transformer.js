@@ -1,6 +1,6 @@
 import { Router } from "express";
 import type { UIMessage } from "ai";
-import { convertToModelMessages } from "ai";
+import { convertToModelMessages, createUIMessageStream, toUIMessageStream, pipeUIMessageStreamToResponse } from "ai";
 import type { EpisodicStore } from "../../memory/episodic.store.js";
 import { getOrCreateSession } from "../sessions.js";
 import { createLogger } from "../../utils/logger.js";
@@ -46,11 +46,25 @@ export function createChatRouter(episodicStore: EpisodicStore, semanticStore: Se
 
       const modelMessages = await convertToModelMessages(messages);
 
-      const result = await session.orchestrator.stream({ messages: modelMessages });
-
-      let fullResponse = "";
-      result.pipeUIMessageStreamToResponse(res, {
+      const stream = createUIMessageStream({
+        execute: async ({ writer }) => {
+          session.writerRef.current = writer;
+          try {
+            const result = await session.orchestrator.stream({ messages: modelMessages });
+            writer.merge(toUIMessageStream({ stream: result.fullStream }));
+            /** Await orchestrator completion so research tool callbacks can write sub-agent steps. */
+            await result.finalStep;
+          } finally {
+            session.writerRef.current = null;
+          }
+        },
+        onError: (err) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          logger.error("Chat stream error", { conversationId: id, error: msg });
+          return msg;
+        },
         onEnd: async ({ responseMessage }) => {
+          let fullResponse = "";
           const parts = responseMessage?.parts ?? [];
           for (const part of parts) {
             if (part.type === "text") fullResponse += part.text;
@@ -78,6 +92,8 @@ export function createChatRouter(episodicStore: EpisodicStore, semanticStore: Se
           }
         },
       });
+
+      pipeUIMessageStreamToResponse({ response: res, stream });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       logger.error("Chat route error", { conversationId: id, error: msg });

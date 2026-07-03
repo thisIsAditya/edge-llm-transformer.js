@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
-export type ModelKey = "asr" | "title" | "autocomplete" | "guard";
+export type ModelKey = "asr" | "title" | "grammar" | "guard";
 
 interface ModelState {
   status: "loading" | "ready" | "error";
@@ -25,7 +25,7 @@ const ModelsContext = createContext<ModelsContextValue | null>(null);
 const MODEL_LABELS: Record<ModelKey, string> = {
   asr: "Speech recognition",
   title: "Title generator",
-  autocomplete: "Autocomplete",
+  grammar: "Grammar checker",
   guard: "Safety guard",
 };
 
@@ -33,7 +33,7 @@ function initialModels(): Record<ModelKey, ModelState> {
   return {
     asr: { status: "loading", progress: 0, label: MODEL_LABELS.asr },
     title: { status: "loading", progress: 0, label: MODEL_LABELS.title },
-    autocomplete: { status: "loading", progress: 0, label: MODEL_LABELS.autocomplete },
+    grammar: { status: "loading", progress: 0, label: MODEL_LABELS.grammar },
     guard: { status: "loading", progress: 0, label: MODEL_LABELS.guard },
   };
 }
@@ -43,7 +43,7 @@ export function ModelsProvider({ children }: { children: ReactNode }) {
   const lastReadyRef = useRef<Record<ModelKey, ReadyPayload | null>>({
     asr: null,
     title: null,
-    autocomplete: null,
+    grammar: null,
     guard: null,
   });
   const workersRef = useRef<Record<ModelKey, Worker> | null>(null);
@@ -56,7 +56,7 @@ export function ModelsProvider({ children }: { children: ReactNode }) {
     workersRef.current = {
       asr: new Worker(new URL("../workers/asrWorker.ts", import.meta.url), { type: "module" }),
       title: new Worker(new URL("../workers/titleWorker.ts", import.meta.url), { type: "module" }),
-      autocomplete: new Worker(new URL("../workers/autocompleteWorker.ts", import.meta.url), { type: "module" }),
+      grammar: new Worker(new URL("../workers/grammarWorker.ts", import.meta.url), { type: "module" }),
       guard: new Worker(new URL("../workers/guardWorker.ts", import.meta.url), { type: "module" }),
     };
   }

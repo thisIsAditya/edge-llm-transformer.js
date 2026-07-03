@@ -39,6 +39,11 @@ export function useConversationContext(
 
     if (status === "ready" && wasActive && messages.length > 0) {
       const summary = buildSummary(messages);
+      console.group("[ConversationContext] Context update");
+      console.log("conversationId:", conversationId);
+      console.log("buildSummary() →", summary ? `"${summary.slice(0, 200)}…"` : "(empty)");
+      console.log("full summary length:", summary.length, "chars");
+      console.groupEnd();
       if (summary) {
         contextByConvRef.current.set(conversationId, summary);
         setContext(summary);

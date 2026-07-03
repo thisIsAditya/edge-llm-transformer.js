@@ -1,12 +1,21 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { isToolUIPart, isReasoningUIPart, getToolName } from "ai";
+import { isToolUIPart, isReasoningUIPart, isDataUIPart, getToolName } from "ai";
 import type { UIMessage, ToolUIPart, DynamicToolUIPart, UITools } from "ai";
 import {
   Search, Globe, Database, ChevronDown,
   Brain, Wrench, CheckCircle2, Loader2, Sparkles, XCircle,
+  BookOpen,
 } from "lucide-react";
+/** Mirrors SubagentStepData from core/src/orchestrator/orchestrator.agent.ts */
+interface SubagentStepData {
+  parentToolCallId: string;
+  subStepId: string;
+  toolName: string;
+  phase: "start" | "end";
+  payload: string;
+}
 
 interface MessageBubbleProps {
   message: UIMessage;
@@ -17,9 +26,11 @@ interface MessageBubbleProps {
 type TextPart = Extract<UIMessage["parts"][number], { type: "text" }>;
 
 function toolMeta(name: string): { Icon: React.ComponentType<{ className?: string }>; label: string } {
-  if (name === "research")      return { Icon: Globe,    label: "Web Search"    };
-  if (name === "memory_search") return { Icon: Search,   label: "Memory Recall" };
-  if (name === "memory_save")   return { Icon: Database, label: "Save to Memory" };
+  if (name === "research")              return { Icon: Globe,     label: "Web Research"   };
+  if (name === "memory_search")         return { Icon: Search,    label: "Memory Recall"  };
+  if (name === "memory_save")           return { Icon: Database,  label: "Save to Memory" };
+  if (name === "exa__web_search_exa")   return { Icon: Globe,     label: "Searching"      };
+  if (name === "exa__web_fetch_exa")    return { Icon: BookOpen,  label: "Reading page"   };
   return { Icon: Wrench, label: name };
 }
 
@@ -35,8 +46,57 @@ function prettyValue(value: unknown): string {
 
 type AnyToolPart = ToolUIPart<UITools> | DynamicToolUIPart;
 
+/* ── Sub-agent step row (nested inside Research card) ────────────────────── */
+function SubagentStepRow({ step }: { step: SubagentStepData }) {
+  const [open, setOpen] = useState(false);
+  const { Icon, label } = toolMeta(step.toolName);
+  const isDone = step.phase === "end";
+
+  return (
+    <div className="rounded-lg border border-border bg-app overflow-hidden text-xs">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-2.5 w-full px-3 py-2 hover:bg-hover transition-colors text-left"
+      >
+        <span className="flex items-center justify-center w-5 h-5 rounded bg-brand-soft shrink-0">
+          <Icon className="w-3 h-3 text-brand" />
+        </span>
+
+        <span className="font-medium text-ink">{label}</span>
+
+        <span className="ml-auto flex items-center gap-2 shrink-0">
+          {isDone ? (
+            <span className="flex items-center gap-1 text-emerald-600 font-medium">
+              <CheckCircle2 className="w-3 h-3" />
+              Done
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-brand font-medium">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Running
+            </span>
+          )}
+          {step.payload && (
+            <ChevronDown
+              className={`w-3 h-3 text-ink-dim transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+            />
+          )}
+        </span>
+      </button>
+
+      {open && step.payload && (
+        <div className="border-t border-border px-3 py-2">
+          <pre className="text-ink-soft whitespace-pre-wrap break-all font-mono text-[10px] leading-relaxed max-h-36 overflow-y-auto">
+            {step.payload}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Tool call expandable card ───────────────────────────────────────────── */
-function ToolCallCard({ part }: { part: AnyToolPart }) {
+function ToolCallCard({ part, subSteps }: { part: AnyToolPart; subSteps: SubagentStepData[] }) {
   const [open, setOpen] = useState(false);
   const name = getToolName(part);
   const { Icon, label } = toolMeta(name);
@@ -49,6 +109,8 @@ function ToolCallCard({ part }: { part: AnyToolPart }) {
   const output = part.state === "output-available" ? part.output : undefined;
   const errorText = part.state === "output-error" ? part.errorText : undefined;
 
+  const hasSubSteps = subSteps.length > 0;
+
   return (
     <div className="rounded-xl border border-border bg-surface overflow-hidden text-xs shadow-sm shadow-violet-100/50">
       <button
@@ -60,6 +122,12 @@ function ToolCallCard({ part }: { part: AnyToolPart }) {
         </span>
 
         <span className="font-medium text-ink">{label}</span>
+
+        {hasSubSteps && isRunning && (
+          <span className="text-ink-dim font-normal">
+            · {subSteps[subSteps.length - 1]?.toolName === "exa__web_fetch_exa" ? "Reading…" : "Searching…"}
+          </span>
+        )}
 
         <span className="ml-auto flex items-center gap-2.5 shrink-0">
           {isDone && (
@@ -88,6 +156,18 @@ function ToolCallCard({ part }: { part: AnyToolPart }) {
 
       {open && (
         <div className="border-t border-border divide-y divide-border">
+          {/* Sub-agent trace — shown when the research tool has nested steps */}
+          {hasSubSteps && (
+            <div className="px-3.5 py-3 space-y-1.5">
+              <p className="text-[10px] uppercase tracking-widest text-ink-dim font-semibold">Research steps</p>
+              <div className="space-y-1.5 pl-1">
+                {subSteps.map((step) => (
+                  <SubagentStepRow key={`${step.subStepId}-${step.phase}`} step={step} />
+                ))}
+              </div>
+            </div>
+          )}
+
           {input !== undefined && (
             <div className="px-3.5 py-3 space-y-1.5">
               <p className="text-[10px] uppercase tracking-widest text-ink-dim font-semibold">Input</p>
@@ -167,6 +247,25 @@ export function MessageBubble({ message, isActive = false }: MessageBubbleProps)
     );
   }
 
+  /** Group sub-agent steps by the parent tool call id they belong to. */
+  const subStepsByParent = new Map<string, SubagentStepData[]>();
+  for (const part of message.parts) {
+    if (isDataUIPart(part) && (part as { type: string }).type === "data-subagentStep") {
+      const step = (part as { data: SubagentStepData }).data;
+      if (!subStepsByParent.has(step.parentToolCallId)) {
+        subStepsByParent.set(step.parentToolCallId, []);
+      }
+      const arr = subStepsByParent.get(step.parentToolCallId)!;
+      /** Keep only the latest phase per subStepId — "end" replaces "start". */
+      const existing = arr.findIndex((s) => s.subStepId === step.subStepId);
+      if (existing >= 0) {
+        arr[existing] = step;
+      } else {
+        arr.push(step);
+      }
+    }
+  }
+
   const isStreamingText = isActive && textParts.length > 0;
 
   return (
@@ -181,7 +280,9 @@ export function MessageBubble({ message, isActive = false }: MessageBubbleProps)
             return <ReasoningBlock key={i} text={part.text} state={part.state} />;
           }
           if (isToolUIPart(part)) {
-            return <ToolCallCard key={i} part={part} />;
+            const toolCallId = (part as { toolCallId?: string }).toolCallId ?? "";
+            const subSteps = subStepsByParent.get(toolCallId) ?? [];
+            return <ToolCallCard key={i} part={part} subSteps={subSteps} />;
           }
           return null;
         })}

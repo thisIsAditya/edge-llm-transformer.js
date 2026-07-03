@@ -1,6 +1,6 @@
 # Local LLM Agent — HTTP API Backend
 
-HTTP API backend for the [Local LLM Chat UI](../frontend). Provides streaming chat, conversation management, and persistent memory — all powered by a local Ollama model.
+HTTP API backend for the [Local LLM Chat UI](../frontend). Provides streaming chat, conversation management, and persistent memory — powered by either a local Ollama model or Anthropic's Claude.
 
 ## Stack
 
@@ -9,6 +9,7 @@ HTTP API backend for the [Local LLM Chat UI](../frontend). Provides streaming ch
 | HTTP server | `express` + `cors` | 5.x |
 | AI orchestration | `ai` (Vercel AI SDK) | 7.x |
 | Ollama provider | `ai-sdk-ollama` | 4.x |
+| Anthropic provider | `@ai-sdk/anthropic` | 4.x |
 | MCP client | `@ai-sdk/mcp` | 2.x |
 | Database | PostgreSQL + pgvector | — |
 | Schema validation | `zod` | 4.x |
@@ -43,6 +44,16 @@ cp .env.example .env
 # Edit .env with your DATABASE_URL, EXA_API_KEY, and model names
 ```
 
+**To swap to Anthropic Claude** instead of local Ollama, set in `.env`:
+
+```bash
+MODEL_PROVIDER=anthropic
+ANTHROPIC_API_KEY=sk-ant-...
+ANTHROPIC_MODEL=claude-haiku-4-5-20251001   # or claude-sonnet-4-5-20250929
+```
+
+Embeddings always use Ollama (`nomic-embed-text`) regardless of `MODEL_PROVIDER`.
+
 ### 4. Install dependencies and run migrations
 
 ```bash
@@ -64,9 +75,12 @@ The frontend (`../frontend`) connects to this server at port 3210.
 |----------|---------|-------------|
 | `DATABASE_URL` | required | Postgres connection string |
 | `EXA_API_KEY` | required | Exa web search API key |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama host |
-| `OLLAMA_MODEL` | `erwan2/DeepSeek-R1-Distill-Qwen-1.5B` | Chat model |
-| `OLLAMA_EMBED_MODEL` | `nomic-embed-text` | Embedding model |
+| `MODEL_PROVIDER` | `ollama` | `ollama` or `anthropic` |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama host (ollama only) |
+| `OLLAMA_MODEL` | `erwan2/DeepSeek-R1-Distill-Qwen-1.5B` | Ollama chat model |
+| `OLLAMA_EMBED_MODEL` | `nomic-embed-text` | Embedding model (always Ollama) |
+| `ANTHROPIC_API_KEY` | — | Required when `MODEL_PROVIDER=anthropic` |
+| `ANTHROPIC_MODEL` | `claude-haiku-4-5-20251001` | Anthropic chat model |
 | `PORT` | `3210` | HTTP server port |
 | `CORS_ORIGIN` | `http://localhost:5173` | Allowed CORS origin (frontend URL) |
 

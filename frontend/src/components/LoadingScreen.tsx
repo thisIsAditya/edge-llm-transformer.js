@@ -6,12 +6,12 @@ const RETENTION_MESSAGES = [
   "Setting up your private, on-device AI assistant…",
   "Everything runs locally — your data never leaves this browser.",
   "Downloading models once; they'll be cached for next time.",
-  "Preparing speech recognition, autocomplete, title generation, and a safety guard…",
+  "Preparing speech recognition, grammar checking, title generation, and a safety guard…",
   "Larger models make smarter suggestions — thanks for your patience!",
   "Almost there…",
 ];
 
-const ORDER: ModelKey[] = ["autocomplete", "title", "guard", "asr"];
+const ORDER: ModelKey[] = ["grammar", "title", "guard", "asr"];
 
 export function LoadingScreen() {
   const { models, overallProgress } = useModelsContext();

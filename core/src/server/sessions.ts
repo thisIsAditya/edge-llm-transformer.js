@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
 import type pg from "pg";
+import type { UIMessageStreamWriter } from "ai";
 import { buildOrchestrator } from "../orchestrator/orchestrator.agent.js";
 import { WorkingMemory } from "../memory/working-memory.js";
 import { TaskLedgerStore } from "../orchestrator/task-ledger.js";
@@ -15,6 +16,8 @@ const logger = createLogger("sessions");
 interface Session {
   orchestrator: ToolLoopAgent<never>;
   workingMemory: WorkingMemory;
+  /** Holds the active request's stream writer so the research tool can emit sub-agent steps. */
+  writerRef: { current: UIMessageStreamWriter | null };
 }
 
 interface SharedDeps {
@@ -43,6 +46,7 @@ export async function getOrCreateSession(conversationId: string): Promise<Sessio
   const workingMemory = new WorkingMemory();
   const taskLedgerStore = new TaskLedgerStore(pool);
   const progressLedgerStore = new ProgressLedgerStore(pool);
+  const writerRef: { current: UIMessageStreamWriter | null } = { current: null };
 
   const orchestrator = buildOrchestrator({
     pool,
@@ -53,9 +57,10 @@ export async function getOrCreateSession(conversationId: string): Promise<Sessio
     taskLedgerStore,
     progressLedgerStore,
     researcherAgent,
+    writerRef,
   }) as ToolLoopAgent<never>;
 
-  const session: Session = { orchestrator, workingMemory };
+  const session: Session = { orchestrator, workingMemory, writerRef };
   sessions.set(conversationId, session);
   logger.info("Session created", { conversationId });
   return session;
