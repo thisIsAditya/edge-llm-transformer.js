@@ -12,6 +12,10 @@ Local_LLM/
 
 The frontend is the only thing the user opens. `core/` is the backend.
 
+## The app - Screenshots
+
+![Loading transformer.js models in the browser](docs/images/startup-model-loading.png)
+
 ## Features
 
 - **Chat history sidebar** — conversations persisted in Postgres, listed like Claude
@@ -27,12 +31,6 @@ The frontend is the only thing the user opens. `core/` is the backend.
 On first load, the speech, grammar, title and safety-guard models download and run locally.
 
 ![Startup screen showing the grammar checker, title generator, safety guard and speech recognition models loading](docs/images/startup-model-loading.png)
-
-### Grammar check
-
-The composer underlines mistakes and offers a one-click fix.
-
-![Composer with the text "Hey my name is Aditya and my phone number is 7709213053." and a Fix all button](docs/images/grammar-check.png)
 
 ### Secret masking
 
