@@ -20,6 +20,49 @@ The frontend is the only thing the user opens. `core/` is the backend.
 - **Memory** — pgvector semantic memory + episodic message store across sessions
 - **Web research** — orchestrator can delegate to a researcher sub-agent using Exa
 
+## Screenshots
+
+### Models load in the browser
+
+On first load, the speech, grammar, title and safety-guard models download and run locally.
+
+![Startup screen showing the grammar checker, title generator, safety guard and speech recognition models loading](docs/images/startup-model-loading.png)
+
+### Grammar check
+
+The composer underlines mistakes and offers a one-click fix.
+
+![Composer with the text "Hey my name is Aditya and my phone number is 7709213053." and a Fix all button](docs/images/grammar-check.png)
+
+### Secret masking
+
+The browser masks secrets before a message leaves it. The model and the server only see `[REDACTED]`, and a notice names what was masked.
+
+![Sent message with ADMIN_SECRET_KEY and SESSION_SECRET replaced by [REDACTED]](docs/images/secret-masking-message.png)
+
+![Full chat with the masked message, the assistant reply, and a notice reading "Masked sensitive data before sending: Env-style Secret"](docs/images/secret-masking-chat.png)
+
+### Voice input
+
+The mic button turns red while recording. Click it again to transcribe into the composer.
+
+![Composer with the mic button in its red recording state](docs/images/voice-input-recording.png)
+
+## Run with Docker
+
+One command starts everything: Postgres with pgvector, Ollama, the API, and the UI behind nginx.
+
+```bash
+cp .env.example .env    # set EXA_API_KEY at minimum
+docker compose up --build
+```
+
+Open http://localhost:8080 (change with `WEB_PORT`). The first start pulls the Ollama chat and embedding models, so it can take several minutes. The API only starts once the pull finishes.
+
+nginx serves the UI and proxies `/api/` to `core`, so the browser calls one origin. It also sets the COOP and COEP headers that Whisper's WASM threading needs. Postgres data and Ollama models live in the `pgdata` and `ollama` volumes. `docker compose down -v` deletes them.
+
+Without Docker, use the setup below.
+
 ## Prerequisites
 
 - Node.js 22+
@@ -67,5 +110,18 @@ Open http://localhost:5173 in your browser.
 ## Voice Input
 
 On first load, the Whisper model (~80 MB WASM / ~160 MB WebGPU) downloads from Hugging Face and is cached in the browser. After that, it loads instantly.
+
+### Using a different Whisper model
+
+The default is `onnx-community/whisper-base.en` from the Hub. To use another model, set these in `frontend/.env` (dev) or the root `.env` (Docker):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VITE_ASR_MODEL_ID` | `onnx-community/whisper-base.en` | Hub model id, or a folder name under `frontend/public/models/` |
+| `VITE_ASR_LOCAL_MODELS` | `false` | Set `true` to load `VITE_ASR_MODEL_ID` from `/models/<id>` |
+
+A local model needs the transformers.js ONNX layout (`config.json`, `onnx/encoder_model_*.onnx`, `onnx/decoder_model_merged_*.onnx`, tokenizer files). The worker requests `fp16` files on WebGPU and `q8` files on WASM. Vite inlines these values at build time, so rebuild the frontend image after changing them.
+
+The fine-tuning pipeline that produced `whisper-base-en-ewc-v1` lives in its own repo and is not part of this one.
 
 Click the mic button in the composer to start recording. Click again to stop. The transcribed text is placed in the text box for you to edit before sending.
