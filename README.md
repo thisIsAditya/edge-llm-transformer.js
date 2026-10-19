@@ -12,10 +12,6 @@ Local_LLM/
 
 The frontend is the only thing the user opens. `core/` is the backend.
 
-## The app - Screenshots
-
-![Loading transformer.js models in the browser](docs/images/startup-model-loading.png)
-
 ## Features
 
 - **Chat history sidebar** — conversations persisted in Postgres, listed like Claude
