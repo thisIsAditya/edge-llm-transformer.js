@@ -1,6 +1,7 @@
 /**
- * Regex-based secret scanner (sync, main thread).
- * Structured credential formats are clearer with patterns than with an ML classifier.
+ * Regex-based secret and PII scanner (sync, main thread).
+ * Structured formats (credentials, card numbers, emails, SSNs, phone numbers) are clearer with
+ * patterns than with an ML classifier. Free-text PII such as names and addresses is not covered.
  */
 
 interface SecretPattern {
@@ -39,7 +40,12 @@ const SECRET_PATTERNS: SecretPattern[] = [
     regex: /\b([A-Z][A-Z0-9_]*(?:SECRET|TOKEN|PASSWORD|API_KEY|APIKEY|PRIVATE_KEY)[A-Z0-9_]*)(\s*=\s*)(\S+)/g,
     replacer: (key, sep) => `${key}${sep}[REDACTED]`,
   },
+  { label: "Email Address", regex: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b/g },
+  { label: "US SSN", regex: /\b(?!000|666|9\d\d)\d{3}-(?!00)\d{2}-(?!0000)\d{4}\b/g },
 ];
+
+/** Requires separators or a leading +, so bare digit runs (IDs, order numbers) are left alone. */
+const PHONE_REGEX = /(?<![\w-])(?:\+\d{1,3}[ .-]?)?(?:\(\d{3}\)\s?|\d{3}[ .-])\d{3}[ .-]\d{4}(?![\w-])/g;
 
 function luhnCheck(digits: string): boolean {
   let sum = 0;
@@ -83,13 +89,18 @@ export function maskCredentials(text: string): CredentialScanResult {
   }
 
   /** Luhn check avoids flagging arbitrary long digit sequences. */
-  masked = masked.replace(/\b(?:\d[ -]?){13,19}\b/g, (match) => {
+  masked = masked.replace(/\b\d(?:[ -]?\d){12,18}\b/g, (match) => {
     const digits = match.replace(/[ -]/g, "");
     if (digits.length >= 13 && digits.length <= 19 && luhnCheck(digits)) {
       markFound("Credit Card Number");
       return REDACT("Credit Card Number");
     }
     return match;
+  });
+
+  masked = masked.replace(PHONE_REGEX, () => {
+    markFound("Phone Number");
+    return REDACT("Phone Number");
   });
 
   return { masked, found };
