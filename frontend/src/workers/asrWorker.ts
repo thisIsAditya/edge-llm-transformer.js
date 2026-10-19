@@ -1,8 +1,9 @@
 import { pipeline, env } from "@huggingface/transformers";
+import { ASR_LOCAL_MODELS, ASR_MODEL_ID } from "../lib/config.js";
 
-env.allowLocalModels = false;
+env.allowLocalModels = ASR_LOCAL_MODELS;
 
-const MODEL_ID = "onnx-community/whisper-base.en";
+const MODEL_ID = ASR_MODEL_ID;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let transcriber: any = null;

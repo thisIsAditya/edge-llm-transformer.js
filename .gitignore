@@ -5,3 +5,5 @@ dist/
 core/node_modules/
 frontend/node_modules/
 frontend/dist/
+frontend/public/models/*
+!frontend/public/models/.gitkeep
